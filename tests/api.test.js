@@ -91,3 +91,16 @@ test('API HTTP valida origem, campos, versões e códigos de resposta',async()=>
  assert.ok(response.headers.get('content-security-policy').includes("default-src 'self'"));
  }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));store.db.close();}
 });
+
+test('API aceita a origem HTTPS da demonstração atrás do proxy confiável',async()=>{
+ const previous=process.env.TRUST_PROXY;process.env.TRUST_PROXY='1';
+ const store=createStore(':memory:',false),app=createApp(store),server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ try{
+  const response=await fetch(base+'/api/tickets',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://127.0.0.1:'+server.address().port,'X-Forwarded-Proto':'https'},body:JSON.stringify(valid())});
+  assert.equal(response.status,201);
+ }finally{
+  if(previous===undefined)delete process.env.TRUST_PROXY;else process.env.TRUST_PROXY=previous;
+  server.closeAllConnections();await new Promise(resolve=>server.close(resolve));store.db.close();
+ }
+});

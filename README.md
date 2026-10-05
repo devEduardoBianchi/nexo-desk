@@ -1,6 +1,6 @@
 # Nexo Desk
 
-Sistema de chamados para suporte técnico criado como projeto de portfólio. A aplicação funciona localmente, com interface em português e inglês, temas claro e escuro, animações com GSAP e dados persistidos em SQLite.
+Sistema de chamados para suporte técnico criado como projeto de portfólio. A interface tem português e inglês, temas claro e escuro e animações com GSAP. O desenvolvimento local usa SQLite; a demonstração na Vercel usa PostgreSQL hospedado.
 
 ![Visão geral do Nexo Desk em tema escuro](docs/preview-desktop.png)
 
@@ -15,7 +15,7 @@ npm start
 
 Abra **http://127.0.0.1:3333**. O servidor escuta apenas em `127.0.0.1` por padrão. Para desenvolvimento, use `npm run dev`; para verificar a API e as regras de negócio, use `npm test`.
 
-Na primeira execução, o sistema cria `data/nexo.sqlite` e insere 24 chamados fictícios e quatro responsáveis fictícios. Esse banco permanece após reiniciar o servidor. A pasta `data/` com arquivos SQLite não entra no Git. Para voltar aos dados iniciais, pare o servidor e remova o arquivo SQLite local após guardar uma cópia do que quiser preservar.
+Na primeira execução local, o sistema cria `data/nexo.sqlite` e insere 24 chamados fictícios e quatro responsáveis fictícios. Esse banco permanece após reiniciar o servidor. A pasta `data/` com arquivos SQLite não entra no Git. Para voltar aos dados iniciais, pare o servidor e remova o arquivo SQLite local após guardar uma cópia do que quiser preservar.
 
 ## O que funciona
 
@@ -35,19 +35,25 @@ Os prazos usam horas corridas: **em dia** quando faltam mais de 24 horas, **venc
 ## Estrutura
 
 ```text
+app.js          Entrada Express reconhecida pela Vercel
 public/         Interface HTML, CSS e JavaScript sem framework
   app.js        Estado, navegação, formulários e chamadas à API
   views.js      Telas e componentes de interface
   i18n.js       Traduções e formatação
   motion.js     GSAP: timeline, Flip, ScrollTrigger, DrawSVG e CustomEase
   domain.js     Regras compartilhadas de validação e prazo
-server/         API Express e banco SQLite
-  index.js      Rotas e servidor local
-  database.js   Esquema, consultas, dados fictícios e histórico
+server/         API Express e armazenamento
+  index.js      Rotas HTTP usadas nas duas hospedagens
+  database.js   SQLite para desenvolvimento local
+  postgres.js   PostgreSQL para a Vercel
+  query.js      Filtros e indicadores compartilhados
+  demo-data.js  Dados fictícios iniciais
   csv.js        Exportação CSV localizada e segura para planilhas
+scripts/        Preparação dos arquivos públicos do GSAP
 tests/          Verificações de API e regras de negócio
 docs/           Capturas de tela para apresentação
 data/           Banco local criado automaticamente (ignorado pelo Git)
+vercel.json     Configuração da publicação na Vercel
 ```
 
 A API usa `/api/meta`, `/api/summary`, `/api/tickets`, `/api/tickets.csv`, `/api/tickets/:id`, `/api/tickets/:id/notes`, `/api/bulk` e `/api/undo`. O frontend recebe os dados via HTTP; os dados não ficam em um array simulado no navegador.
@@ -58,8 +64,16 @@ O Nexo Desk usa uma área operacional compacta com marca grafite e verde-lima. A
 
 GSAP coordena a entrada inicial, a passagem entre lista e quadro (`Flip`), a abertura de detalhes, o destaque dos gráficos com `ScrollTrigger`, traços SVG com `DrawSVGPlugin` e uma curva de animação com `CustomEase`. As animações de conteúdo são removidas quando o sistema detecta `prefers-reduced-motion: reduce`; sem GSAP, o conteúdo e os controles continuam visíveis e funcionais.
 
+## Publicar uma demonstração na Vercel
+
+1. Importe o repositório `nexo-desk` como um projeto na Vercel. Mantenha a raiz do projeto como diretório de origem e o framework **Express**.
+2. Na Vercel, crie ou conecte um banco PostgreSQL pelo **Storage/Marketplace** (por exemplo, Neon). Use a conexão **pooled** e disponibilize a URL como variável de ambiente `DATABASE_URL` para Production e, se for usar prévias, Preview. Não coloque a URL real em arquivos versionados.
+3. Publique o projeto. O build copia os arquivos de GSAP para `public/vendor/`; a Vercel serve os arquivos da interface e executa a API como uma Function. Na primeira chamada à API, o backend cria as tabelas e os 24 chamados fictícios.
+
+Se a integração do banco criar outra variável, configure `DATABASE_URL` nas configurações do projeto com a URL de conexão recebida. Os dados da demonstração na Vercel permanecem no PostgreSQL entre publicações e são compartilhados entre visitantes. A aplicação local continua usando seu próprio SQLite. A URL fictícia em `.env.example` é apenas um modelo.
+
 ## Limites da demonstração
 
-Este projeto é para uso **local e demonstrativo**. Não tem contas, autenticação, permissões reais, envio de e-mail, anexos nem integração externa. Os responsáveis e chamados iniciais são fictícios. Não publique uma instância aberta na internet sem desenhar e implementar essas partes, revisão de segurança e operações apropriadas. Use apenas dados de teste nesta demonstração.
+Este projeto é para uso **demonstrativo**. Não tem contas, autenticação, permissões reais, envio de e-mail nem anexos. Em uma publicação pública, qualquer pessoa pode consultar e alterar os chamados fictícios, sem autenticação; as alterações ficam visíveis a todos até a base ser reiniciada. Não insira dados pessoais, confidenciais ou de clientes. Para uso real, crie outro projeto e implemente autenticação, permissões e as demais operações necessárias.
 
 ![Nexo Desk em inglês, tema claro e largura de celular](docs/preview-mobile.png)

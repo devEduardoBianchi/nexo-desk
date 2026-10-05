@@ -7,8 +7,12 @@ import { toCsv } from "./csv.js";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export function createApp(
   store = createStore(resolve(root, "data/nexo.sqlite")),
+  app = express(),
 ) {
-  const app = express();
+  // The hosting platform terminates HTTPS at one trusted proxy. Keep local
+  // development on Express defaults unless a deployment opts in explicitly.
+  if (Number(process.env.TRUST_PROXY) > 0)
+    app.set("trust proxy", Number(process.env.TRUST_PROXY));
   app.disable("x-powered-by");
   app.use((req, res, next) => {
     res.set({
@@ -43,47 +47,47 @@ export function createApp(
     res.set("Cache-Control", "no-store");
     next();
   });
-  app.get("/api/meta", (_req, res) =>
-    res.json({ agents: store.agents(), currentAgentId: 1, demo: true }),
+  app.get("/api/meta", async (_req, res) =>
+    res.json({ agents: await store.agents(), currentAgentId: 1, demo: true }),
   );
-  app.get("/api/summary", (req, res) =>
-    res.json(store.summary(req.query.days)),
+  app.get("/api/summary", async (req, res) =>
+    res.json(await store.summary(req.query.days)),
   );
-  app.get("/api/tickets", (req, res) =>
-    res.json({ tickets: store.list(req.query) }),
+  app.get("/api/tickets", async (req, res) =>
+    res.json({ tickets: await store.list(req.query) }),
   );
-  app.get("/api/tickets.csv", (req, res) => {
+  app.get("/api/tickets.csv", async (req, res) => {
     res.attachment(
       "nexo-desk-" + new Date().toISOString().slice(0, 10) + ".csv",
     );
     res.type("text/csv; charset=utf-8");
-    res.send(toCsv(store.list(req.query), store.agents(), req.query.lang));
+    res.send(toCsv(await store.list(req.query), await store.agents(), req.query.lang));
   });
-  app.get("/api/tickets/:id", (req, res) => {
-    const ticket = store.get(Number(req.params.id));
+  app.get("/api/tickets/:id", async (req, res) => {
+    const ticket = await store.get(Number(req.params.id));
     if (!ticket) return res.status(404).json({ error: "notFound" });
-    res.json({ ticket, events: store.history(ticket.id) });
+    res.json({ ticket, events: await store.history(ticket.id) });
   });
-  app.post("/api/tickets", (req, res) =>
-    res.status(201).json({ ticket: store.insert(req.body) }),
+  app.post("/api/tickets", async (req, res) =>
+    res.status(201).json({ ticket: await store.insert(req.body) }),
   );
-  app.patch("/api/tickets/:id", (req, res) =>
-    res.json(store.update(Number(req.params.id), req.body)),
+  app.patch("/api/tickets/:id", async (req, res) =>
+    res.json(await store.update(Number(req.params.id), req.body)),
   );
-  app.post("/api/tickets/:id/notes", (req, res) =>
+  app.post("/api/tickets/:id/notes", async (req, res) =>
     res
       .status(201)
       .json({
-        ticket: store.note(
+        ticket: await store.note(
           Number(req.params.id),
           req.body.text,
           req.body.version,
         ),
       }),
   );
-  app.post("/api/bulk", (req, res) => res.json(store.bulk(req.body)));
-  app.post("/api/undo", (req, res) =>
-    res.json(store.undo(String(req.body.token || ""))),
+  app.post("/api/bulk", async (req, res) => res.json(await store.bulk(req.body)));
+  app.post("/api/undo", async (req, res) =>
+    res.json(await store.undo(String(req.body.token || ""))),
   );
   // Only the required browser distributions are exposed, not all node_modules.
   for (const file of [
@@ -118,8 +122,9 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const port = Number(process.env.PORT || 3333);
-  const server = createApp().listen(port, "127.0.0.1", () =>
-    console.log(`Nexo Desk: http://127.0.0.1:${port}`),
+  const host = process.env.HOST || "127.0.0.1";
+  const server = createApp().listen(port, host, () =>
+    console.log(`Nexo Desk: http://${host}:${port}`),
   );
   server.on("error", (e) => {
     console.error(e.message);

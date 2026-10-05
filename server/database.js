@@ -2,7 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { STATUSES, PRIORITIES, CATEGORIES, validateTicket, deadline, isDone } from '../public/domain.js';
+import { validateTicket, isDone } from '../public/domain.js';
+import { DEMO_AGENTS, DEMO_NOTE, demoTickets } from './demo-data.js';
+import { listTickets, summarizeTickets } from './query.js';
 
 export function createStore(filename = resolve('data/nexo.sqlite'), seed = true) {
   if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true });
@@ -19,7 +21,7 @@ export function createStore(filename = resolve('data/nexo.sqlite'), seed = true)
     CREATE INDEX IF NOT EXISTS events_ticket ON events(ticketId, id);`);
   const agents = () => db.prepare('SELECT * FROM agents ORDER BY id').all();
   if (!agents().length) {
-    for (const [id, name, initials] of [[1,'Alex Morgan','AM'],[2,'Camila Torres','CT'],[3,'Lucas Martins','LM'],[4,'Sofia Costa','SC']]) db.prepare('INSERT INTO agents VALUES(?,?,?)').run(id,name,initials);
+    for (const [id, name, initials] of DEMO_AGENTS) db.prepare('INSERT INTO agents VALUES(?,?,?)').run(id,name,initials);
   }
   const decode = row => row ? { ...row, tags: JSON.parse(row.tags) } : null;
   const get = id => decode(db.prepare('SELECT * FROM tickets WHERE id=?').get(id));
@@ -91,46 +93,12 @@ export function createStore(filename = resolve('data/nexo.sqlite'), seed = true)
       return get(id);
     });
   }
-  function list(query={}) {
-    const q=String(query.q||'').toLocaleLowerCase().trim();
-    const result=all().filter(t=>{
-      if(q&&!`${t.id} NEX-${t.id} NEX-${String(t.id).padStart(3,'0')} ${t.title} ${t.description} ${t.requester} ${t.email} ${t.tags.join(' ')}`.toLocaleLowerCase().includes(q))return false;
-      if(['status','priority','category'].some(k=>query[k]&&query[k]!==t[k]))return false;
-      if(query.assigneeId&&Number(query.assigneeId)!==t.assigneeId)return false;
-      if(query.deadline&&deadline(t)!==query.deadline)return false;
-      const queue=query.queue;
-      if(queue==='mine'&&(t.assigneeId!==1||isDone(t)))return false;
-      if(queue==='urgent'&&(t.priority!=='urgent'||isDone(t)))return false;
-      if(queue==='soon'&&deadline(t)!=='soon')return false;
-      if(queue==='overdue'&&deadline(t)!=='overdue')return false;
-      if(queue==='resolved'&&!isDone(t))return false;
-      return true;
-    });
-    const sort=query.sort||'priority';
-    result.sort((a,b)=>sort==='oldest'?a.id-b.id:sort==='newest'?b.id-a.id:sort==='deadline'?a.dueAt.localeCompare(b.dueAt):PRIORITIES.indexOf(b.priority)-PRIORITIES.indexOf(a.priority)||a.dueAt.localeCompare(b.dueAt));
-    return result;
-  }
-  function summary(period=7) {
-    const days=[7,30,90].includes(Number(period))?Number(period):7;
-    const tickets=all(), now=Date.now(), from=now-days*86400000, active=tickets.filter(t=>!isDone(t));
-    const resolved=tickets.filter(t=>isDone(t)&&t.resolvedAt&&Date.parse(t.resolvedAt)>=from);
-    const trend=Array.from({length:days},(_,i)=>{
-      const date=new Date(now-(days-i-1)*86400000).toISOString().slice(0,10);
-      return {date,created:tickets.filter(t=>t.createdAt.startsWith(date)).length,resolved:tickets.filter(t=>t.resolvedAt?.startsWith(date)).length};
-    });
-    return {days,total:tickets.length,open:tickets.filter(t=>t.status==='open').length,progress:tickets.filter(t=>t.status==='progress').length,overdue:active.filter(t=>deadline(t)==='overdue').length,resolved:resolved.length,
-      priorities:PRIORITIES.map(key=>({key,count:active.filter(t=>t.priority===key).length})),categories:CATEGORIES.map(key=>({key,count:active.filter(t=>t.category===key).length})),
-      trend,queues:Object.fromEntries(['all','mine','urgent','soon','overdue','resolved'].map(k=>[k,list({queue:k}).length])),
-      alerts:active.filter(t=>t.priority==='urgent'||['soon','overdue'].includes(deadline(t))).sort((a,b)=>a.dueAt.localeCompare(b.dueAt))};
-  }
+  const list = (query={}) => listTickets(all(),query);
+  const summary = (period=7) => summarizeTickets(all(),period);
   if(seed&&!all().length) transaction(()=>{
-    const titles=['VPN desconectando durante reuniões','Acesso ao painel financeiro','Impressora do escritório offline','Erro ao exportar relatório mensal','Configuração de novo notebook','Permissão para pasta compartilhada','Aplicativo fecha ao anexar arquivo','Instabilidade no Wi-Fi da sala 02','Recuperação de acesso à conta','Monitor externo sem imagem','Atualização do software de projetos','Integração do calendário','Lentidão ao carregar o CRM','Troca de teclado do atendimento','Configuração de assinatura de e-mail','Falha na sincronização de arquivos','Acesso ao ambiente de homologação','Áudio não funciona nas chamadas','Revisão de permissões da equipe','Instalação de ferramenta de design','Rede indisponível na recepção','Erro na autenticação do portal','Configuração de backup local','Onboarding de nova pessoa'];
-    const people=['Marina Alves','Rafael Lima','Beatriz Melo','Pedro Rocha','Julia Santos','Daniel Souza'];
-    for(let i=0;i<titles.length;i++) {
-      const status=['open','progress','waiting','open','progress','resolved','closed','resolved'][i%8];
-      const date=new Date(Date.now()-(i%12)*86400000-3600000).toISOString();
-      const ticket=insert({title:titles[i],description:`Solicitação de demonstração: ${titles[i].toLowerCase()}. A equipe precisa de uma análise e orientação para continuar suas atividades. Dados fictícios para explorar o Nexo Desk.`,requester:people[i%6],email:`pessoa${i+1}@example.com`,category:CATEGORIES[i%5],tags:[['equipe','remoto','escritório'][i%3]],priority:['urgent','high','normal','low'][i%4],status,assigneeId:i%4+1,dueAt:new Date(Date.now()+[-12,8,40,72,16,-4,96,24][i%8]*3600000).toISOString()},date);
-      if(i%3===0)event(ticket.id,'note',{text:'Triagem iniciada. Vamos verificar o comportamento no ambiente de demonstração.'},new Date(Date.parse(date)+1800000).toISOString());
+    for(const {input,date,noteAt} of demoTickets()) {
+      const ticket=insert(input,date);
+      if(noteAt)event(ticket.id,'note',{text:DEMO_NOTE},noteAt);
     }
   });
   return {db,agents,get,all,list,summary,insert:data=>transaction(()=>insert(data)),update,bulk,undo,note,

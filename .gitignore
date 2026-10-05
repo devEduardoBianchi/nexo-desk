@@ -9,5 +9,7 @@ tmp/
 *.log
 coverage/
 dist/
+public/vendor/
+.vercel/
 *.pem
 *.key
