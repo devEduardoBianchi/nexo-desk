@@ -1,5 +1,13 @@
 node_modules/
-data/*.sqlite*
+data/
 tmp/
 .env
+.env.*
+!.env.example
+*.sqlite*
+*.db
 *.log
+coverage/
+dist/
+*.pem
+*.key
