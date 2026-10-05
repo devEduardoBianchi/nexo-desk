@@ -1,0 +1,1 @@
+try { document.documentElement.dataset.theme = localStorage.getItem('nexo-theme') || 'dark'; document.documentElement.lang = localStorage.getItem('nexo-lang') || 'pt-BR'; } catch { /* Storage is optional. */ }
