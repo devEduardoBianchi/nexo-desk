@@ -8,4 +8,6 @@ Movimento: entrada curta da identidade, continuidade entre lista e quadro com Fl
 
 Referências fornecidas: https://carmed-bay.vercel.app/ e https://www.solidtech.digital/ . Referências de ritmo e hierarquia, sem copiar marcas ou ativos. As skills de React/Vue foram consultadas, mas seus adaptadores não são necessários no frontend sem framework solicitado.
 
-Entrega exige dados persistentes, formulários validados, estados vazio/erro/carregamento/sucesso, PT/EN completos, teclado, desktop e celular verificados.
+Na versão pública, cada navegador recebe uma cópia editável dos dados fictícios. A persistência é local e pode ser reiniciada no guia; nenhuma rota de API ou banco é publicada. A implementação Express permanece no repositório para desenvolvimento.
+
+Entrega exige dados persistentes no navegador, formulários validados, estados vazio/erro/carregamento/sucesso, PT/EN completos, teclado, desktop e celular verificados.

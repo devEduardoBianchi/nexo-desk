@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Central de suporte demonstrativa com Express, PostgreSQL, SQLite local e GSAP",
+  "description": "Demonstração estática de central de suporte com dados isolados no navegador",
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js",
+    "start:server": "node server/index.js",
+    "dev:server": "node --watch server/index.js",
     "build": "node scripts/copy-vendor.js",
     "test": "node --test tests/*.test.js"
   },

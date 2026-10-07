@@ -1,5 +1,6 @@
 import { t, lang, setLanguage, number } from "./i18n.js";
 import { STATUSES, validateTicket, deadline } from "./domain.js";
+import { createDemoStore } from "./demo-store.js";
 import { icon } from "./icons.js";
 import {
   shell,
@@ -24,6 +25,7 @@ import {
 } from "./motion.js";
 
 const $ = (selector) => document.querySelector(selector);
+const demoStore = createDemoStore();
 const safeStorage = {
   get(key) {
     try {
@@ -105,24 +107,7 @@ let requestId = 0,
 const dialog = $("#ticket-dialog"),
   confirmation = $("#confirm-dialog");
 async function api(path, options = {}) {
-  let response;
-  try {
-    response = await fetch("/api" + path, {
-      ...options,
-      headers: { "Content-Type": "application/json", ...options.headers },
-    });
-  } catch {
-    throw { code: "networkError" };
-  }
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    throw { code: "serverError" };
-  }
-  if (!response.ok)
-    throw { code: data.error || "serverError", fields: data.fields };
-  return data;
+  return demoStore.request(path, options);
 }
 function params() {
   const query = new URLSearchParams({ queue: state.queue });
@@ -488,13 +473,16 @@ async function saveBulk(form) {
 function exportCSV() {
   const query = params();
   query.set("lang", lang);
+  const blob = new Blob([demoStore.csv(query, lang)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = "/api/tickets.csv?" + query;
+  a.href = url;
   a.download = "nexo-desk.csv";
   a.hidden = true;
   document.body.append(a);
   a.click();
   a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast("csvSaved");
 }
 function toggleMenu(open) {
@@ -588,6 +576,24 @@ document.addEventListener("click", async (event) => {
     state.listPage = 1;
     state.selected.clear();
     await load();
+  } else if (action === "reset-demo") {
+    if (!(await confirmAction("resetDemo", t("resetDemoConfirm"), "resetDemo"))) return;
+    try {
+      demoStore.reset();
+      try {
+        for (let index = sessionStorage.length - 1; index >= 0; index--) {
+          const key = sessionStorage.key(index);
+          if (key?.startsWith("nexo-draft-")) sessionStorage.removeItem(key);
+        }
+      } catch { /* Draft storage may be unavailable. */ }
+      state.selected.clear();
+      state.filters = defaultFilters();
+      state.queue = "all";
+      await load();
+      toast("demoRestored");
+    } catch (err) {
+      toast(err.code || "serverError", null, true);
+    }
   } else if (action === "refresh") await load({ loading: true });
   else if (action === "next" || action === "prev") {
     state.listPage += action === "next" ? 1 : -1;

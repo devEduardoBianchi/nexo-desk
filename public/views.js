@@ -172,7 +172,7 @@ export function guide(state) {
     )
     .join(
       "",
-    )}</div></section><section class="guide-step"><h2>${t("demoScope")}</h2><p>${t("demoScopeText")}</p></section></div>${footer(state)}`;
+    )}</div></section><section class="guide-step"><h2>${t("demoScope")}</h2><p>${t("demoScopeText")}</p><button class="button" type="button" data-action="reset-demo">${t("resetDemo")}</button></section></div>${footer(state)}`;
 }
 function localDate(value) {
   const date = new Date(value);
